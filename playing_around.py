@@ -22,9 +22,6 @@ def remove_tags(string_with_tags):
 	tag_regex = '<.*?>'
 	return re.sub(tag_regex, '', string_with_tags)
 
-def remove_punc(string_with_punc):
-	return string_with_punc.translate(None, string.punctuation)
-
 def tokenize(sentence):
 	return word_tokenize(sentence)
 
@@ -36,17 +33,20 @@ def nouns_only(words):
 def remove_stop_words(words):
 	return [word for word in words if word not in NLTK_ENGLISH_STOPWORDS]
 
+def get_cleaned_words(sentence):
+	words = remove_tags(sentence)
+	words = tokenize(words)
+	nouns = nouns_only(words)
+	return [word for word in remove_stop_words(nouns) if word not in string.punctuation]
+
 def get_cleaned_data(filepath):
 	data = []
 	with open(filepath,'rb') as csvfile:
 		reader = csv.reader(csvfile)
 		for row in reader:
 			sentence = row[1]
-			no_tags = remove_tags(sentence)
-			words = tokenize(no_tags)
-			nouns = nouns_only(words)
-			no_stop_words = remove_stop_words(nouns)
-			cleaned_row = [row[0]] + no_stop_words
+			cleaned_words = get_cleaned_words(sentence)
+			cleaned_row = [row[0]] + cleaned_words
 			print cleaned_row
 			data.append(cleaned_row)
 	return data
