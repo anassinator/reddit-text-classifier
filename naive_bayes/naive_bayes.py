@@ -105,14 +105,19 @@ class PoissonNaiveBayes(Classifier):
         Returns:
             Labeled output vector.
         """
+        n_classes = len(self.classes_)
         f = self._compute_smoothed_frequency(X)
-        p = np.array([
+        z = np.array([
             self._log_prob(f, self.lambda_[c]).sum(axis=1) -
             self._log_prob(f, self.lambda_not_[c]).sum(axis=1)
-            for c in range(len(self.classes_))
-        ])
+            for c in range(n_classes)
+        ]).T
 
-        return self.classes_[np.argmax(p, axis=0)]
+        p_c = np.exp(z + self.class_log_prior_)
+        p_c_not = 1.0 - np.exp(self.class_log_prior_)
+        p = p_c / (p_c + p_c_not)
+
+        return self.classes_[np.argmax(p, axis=1)]
 
     def _log_prob(self, f, mean):
         """Computes the log probability on poisson distribution.
