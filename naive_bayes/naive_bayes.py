@@ -66,3 +66,77 @@ class MultinomialNaiveBayes(Classifier):
         """
         p = X * self.feature_log_prob_.T + self.class_log_prior_
         return self.classes_[np.argmax(p, axis=1)]
+
+
+class PoissonNaiveBayes(Classifier):
+
+    """Poisson Naive Bayes classifier."""
+
+    def fit(self, X, y):
+        """Fits the model.
+
+        Args:
+            X: Input matrix.
+            y: Labeled output vector.
+        """
+        # Compute priors.
+        self.classes_, self.class_count_ = preprocess_output(y)
+        self.class_log_prior_ = compute_log_prob(self.class_count_)
+
+        # Compute means of P(f|c).
+        Y = label_binarize(y, self.classes_)
+        smoothed_f = self._compute_smoothed_frequency(X)
+        self.lambda_ = np.dot(Y.T, smoothed_f)
+        self.lambda_ /= self.class_count_.reshape(-1, 1)
+
+        # Compute means of P(f|c').
+        # Flip the one-hot encoding's bits.
+        Y_not = np.ones(len(self.classes_), dtype=np.int) - Y
+        class_count_not = self.class_count_.sum() - self.class_count_
+        self.lambda_not_ = np.dot(Y_not.T, smoothed_f)
+        self.lambda_not_ /= class_count_not.reshape(-1, 1)
+
+    def predict(self, X):
+        """Predicts the output labels.
+
+        Args:
+            X: Input matrix.
+
+        Returns:
+            Labeled output vector.
+        """
+        f = self._compute_smoothed_frequency(X)
+        p = np.array([
+            self._log_prob(f, self.lambda_[c]).sum(axis=1) -
+            self._log_prob(f, self.lambda_not_[c]).sum(axis=1)
+            for c in range(len(self.classes_))
+        ])
+
+        return self.classes_[np.argmax(p, axis=0)]
+
+    def _log_prob(self, f, mean):
+        """Computes the log probability on poisson distribution.
+
+        Args:
+            f: Smoothed frequency.
+            mean: Mean.
+
+        Returns:
+            Log probability.
+        """
+        return f * np.log(mean) - mean
+
+    def _compute_smoothed_frequency(self, X, alpha=1.0):
+        """Computes the smoothed frequency.
+
+        Args:
+            X: Input matrix.
+            alpha: Laplace smoothing parameter.
+
+        Returns:
+            Smoothed frequency.
+        """
+        _, n_features = X.shape
+        document_lengths = X.sum(axis=1).reshape(-1, 1)
+        smoothed_f = (X + alpha) / (document_lengths + alpha * n_features)
+        return smoothed_f
