@@ -86,6 +86,8 @@ class PoissonNaiveBayes(Classifier):
         # Compute means of P(f|c).
         Y = label_binarize(y, self.classes_)
         smoothed_f = self._compute_smoothed_frequency(X)
+        self._tau = 1.0 / smoothed_f.min()
+        smoothed_f *= self._tau
         self.lambda_ = np.dot(Y.T, smoothed_f)
         self.lambda_ /= self.class_count_.reshape(-1, 1)
 
@@ -106,7 +108,7 @@ class PoissonNaiveBayes(Classifier):
             Labeled output vector.
         """
         n_classes = len(self.classes_)
-        f = self._compute_smoothed_frequency(X)
+        f = self._compute_smoothed_frequency(X) * self._tau
         z = np.array([
             self._log_prob(f, self.lambda_[c]).sum(axis=1) -
             self._log_prob(f, self.lambda_not_[c]).sum(axis=1)
