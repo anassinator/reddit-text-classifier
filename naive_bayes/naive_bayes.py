@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 
-import operator
-from classifier import Classifier
-from collections import Counter, defaultdict
-
 import numpy as np
+from collections import Counter
+from scipy.sparse import issparse
+from classifier import Classifier
 
 
 class PoissonNaiveBayes(Classifier):
@@ -97,9 +96,11 @@ class MultinomialNaiveBayes(Classifier):
 
     def __init__(self):
         """Constructs a MultinomialNaiveBayes classifier."""
-        self._p_x = {}
-        self._p_y = {}
-        self._n = 0
+        self._count = 0
+        self._prior = []
+        self._cond_prob = []
+        self._class_map = {}
+        self._classes = []
 
     def fit(self, X, y):
         """Fits the model.
@@ -108,22 +109,30 @@ class MultinomialNaiveBayes(Classifier):
             X: Input matrix.
             y: Labeled output vector.
         """
-        self._n = len(y)
-        self._p_y = dict(Counter(list(y)))
+        self._count, feature_count = X.shape
 
-        _, feature_count = X.shape
-        self._p_x = {}
-        for i in range(self._n):
-            k = y[i]
-            if k not in self._p_x:
-                self._p_x[k] = [defaultdict(int) for _ in range(feature_count)]
+        # Compute priors.
+        class_counter = Counter(y)
+        self._classes = list(class_counter.keys())
+        class_count = len(self._classes)
+        self._class_map = dict(zip(range(class_count), self._classes))
+        self._prior = np.array(list(class_counter.values()), dtype=np.float)
 
-            for j in range(feature_count):
-                x_j = self._p_x[k][j]
-                x_class = X[i][j]
-                if x_class not in x_j:
-                    x_j[x_class] = 0
-                x_j[x_class] += 1
+        # Compute conditional probabilities.
+        self._cond_prob = np.ones((feature_count, class_count),
+                                  dtype=np.float)
+
+        total_feature_count = class_count * np.ones(class_count)
+        for i in range(feature_count):
+            instances = X[:, i].nonzero()[0]
+            for j in instances:
+                count = X[j, i]
+                c = self._class_map[y[j]]
+                self._cond_prob[i, c] += count
+                total_feature_count[c] += count
+
+        self._cond_prob /= total_feature_count
+        self._prior /= self._count
 
     def predict_one(self, x):
         """Predicts the output label for a single data element.
@@ -134,25 +143,21 @@ class MultinomialNaiveBayes(Classifier):
         Returns:
             Labeled output.
         """
-        probs = {
-            k: self._probability_for_class(x, k)
-            for k in self._p_y
-        }
+        instances = x.nonzero()
+        if issparse(x):
+            instances = instances[1]
+        else:
+            instances = instances[0]
 
-        return max(probs.items(), key=operator.itemgetter(1))[0]
+        p = np.zeros(len(self._classes))
+        for j in instances:
+            if issparse(x):
+                current = x[0, j]
+            else:
+                current = x[j]
+            p += current * np.log(self._cond_prob[j])
 
-    def _probability_for_class(self, x, k):
-        """Computes the probability of a an input belonging to a certain class.
+        p = np.e ** p * self._prior
+        c = np.argmax(p)
 
-        Args:
-            x: Input features.
-            k: Output class.
-
-        Returns:
-            Probability.
-        """
-        p = self._p_y[k] / self._n
-        for i, j in enumerate(x):
-            p_xj_y = (self._p_x[k][i][j] + 1) / (self._p_y[k] + 2)
-            p *= p_xj_y
-        return p
+        return self._classes[c]
