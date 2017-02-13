@@ -7,7 +7,7 @@ class Classifier(object):
 
     def __init__(self):
         """Constructs a Classifier."""
-        raise NotImplemented()
+        pass
 
     def fit(self, X, y):
         """Fits the model.
@@ -15,17 +15,6 @@ class Classifier(object):
         Args:
             X: Input matrix.
             y: Labeled output vector.
-        """
-        raise NotImplemented()
-
-    def predict_one(self, x):
-        """Predicts the output label for a single data element.
-
-        Args:
-            x: Input features.
-
-        Returns:
-            Labeled output.
         """
         raise NotImplemented()
 
@@ -38,7 +27,7 @@ class Classifier(object):
         Returns:
             Labeled output vector.
         """
-        return [self.predict_one(x) for x in X]
+        raise NotImplemented()
 
     def score(self, X, truth):
         """Scores the prediction of the classifier.

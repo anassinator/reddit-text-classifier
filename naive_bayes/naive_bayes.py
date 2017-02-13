@@ -2,8 +2,8 @@
 
 import numpy as np
 from collections import Counter
-from scipy.sparse import issparse
 from classifier import Classifier
+from sklearn.preprocessing import label_binarize
 
 
 class PoissonNaiveBayes(Classifier):
@@ -95,12 +95,8 @@ class MultinomialNaiveBayes(Classifier):
     """Multinomial Naive Bayes classifier."""
 
     def __init__(self):
-        """Constructs a MultinomialNaiveBayes classifier."""
-        self._count = 0
-        self._prior = []
-        self._cond_prob = []
-        self._class_map = {}
-        self._classes = []
+        """Constructs a MultinomialNaiveBayes."""
+        pass
 
     def fit(self, X, y):
         """Fits the model.
@@ -109,55 +105,29 @@ class MultinomialNaiveBayes(Classifier):
             X: Input matrix.
             y: Labeled output vector.
         """
-        self._count, feature_count = X.shape
-
         # Compute priors.
         class_counter = Counter(y)
-        self._classes = list(class_counter.keys())
-        class_count = len(self._classes)
-        self._class_map = dict(zip(range(class_count), self._classes))
-        self._prior = np.array(list(class_counter.values()), dtype=np.float)
+        self.classes_ = np.array(list(class_counter.keys()))
+        self.class_count_ = np.array(list(class_counter.values()),
+                                     dtype=np.float)
+        self.class_log_prior = (np.log(self.class_count_) -
+                                np.log(self.class_count_.sum()))
 
         # Compute conditional probabilities.
-        self._cond_prob = np.ones((feature_count, class_count),
-                                  dtype=np.float)
+        Y = label_binarize(y, self.classes_)
+        self.feature_count_ = Y.T * X + 1
+        feature_sum = self.feature_count_.sum(axis=1)
+        self.feature_log_prob_ = (np.log(self.feature_count_) -
+                                  np.log(feature_sum.reshape(-1, 1)))
 
-        total_feature_count = class_count * np.ones(class_count)
-        for i in range(feature_count):
-            instances = X[:, i].nonzero()[0]
-            for j in instances:
-                count = X[j, i]
-                c = self._class_map[y[j]]
-                self._cond_prob[i, c] += count
-                total_feature_count[c] += count
-
-        self._cond_prob /= total_feature_count
-        self._prior /= self._count
-
-    def predict_one(self, x):
-        """Predicts the output label for a single data element.
+    def predict(self, X):
+        """Predicts the output labels.
 
         Args:
-            x: Input features.
+            X: Input matrix.
 
         Returns:
-            Labeled output.
+            Labeled output vector.
         """
-        instances = x.nonzero()
-        if issparse(x):
-            instances = instances[1]
-        else:
-            instances = instances[0]
-
-        p = np.zeros(len(self._classes))
-        for j in instances:
-            if issparse(x):
-                current = x[0, j]
-            else:
-                current = x[j]
-            p += current * np.log(self._cond_prob[j])
-
-        p = np.e ** p * self._prior
-        c = np.argmax(p)
-
-        return self._classes[c]
+        p = X * self.feature_log_prob_.T + self.class_log_prior
+        return self.classes_[np.argmax(p, axis=1)]
