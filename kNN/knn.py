@@ -134,10 +134,16 @@ def save_confusion_matrix(matrix):
     sn.heatmap(df_cm, annot=True, fmt = 'g')
     plt.savefig("Confusion Matrix")
 
-def read_data_for_classifier():
+def read_train_data_for_classifier():
     return clean_data_pipeline(pd.read_csv(TRAIN_FILE_INPUT))
 
 def read_labels_for_classifier():
     return list(pd.read_csv(TRAIN_LABELS_FILEPATH)['category'])
+
+def read_test_data_for_classifier():
+    return clean_data_pipeline(pd.read_csv(TEST_INPUT_FILEPATH))
+
+predict_and_print()
+
     
 
